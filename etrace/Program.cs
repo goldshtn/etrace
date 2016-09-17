@@ -17,6 +17,8 @@ namespace etrace
         static private TraceEventSession session;
         static private ulong processedEvents = 0;
         static private ulong notFilteredEvents = 0;
+        static private Stopwatch sessionStartStopwatch;
+        static private bool statsPrinted = false;
 
         static void Main(string[] args)
         {
@@ -32,10 +34,9 @@ namespace etrace
             // TODO Can try TraceLog support for realtime stacks as well
             // TODO One session for both kernel and CLR is not supported on Windows 7 and older
 
+            sessionStartStopwatch = Stopwatch.StartNew();
+            Console.WriteLine($"Processing start time: {DateTime.Now}");
             CreateEventProcessor();
-
-            var stopwatch = Stopwatch.StartNew();
-            Console.WriteLine($"\nProcessing start time: {DateTime.Now}");
             using (eventProcessor)
             {
                 if (options.IsFileSession)
@@ -48,12 +49,7 @@ namespace etrace
                 }
             }
 
-            // TODO Get this information printed even on Ctrl+C
-            Console.WriteLine();
-            Console.WriteLine("{0,-30} {1}", "Processing end time:", DateTime.Now);
-            Console.WriteLine("{0,-30} {1}", "Processing duration:", stopwatch.Elapsed);
-            Console.WriteLine("{0,-30} {1}", "Processed events:", processedEvents);
-            Console.WriteLine("{0,-30} {1}", "Displayed events:", notFilteredEvents);
+            CloseSession();
         }
 
         private static void CreateEventProcessor()
@@ -79,15 +75,30 @@ namespace etrace
 
         private static void CloseSession()
         {
-            if (eventProcessor != null)
+            lock (typeof(Program))
             {
-                eventProcessor.Dispose();
-            }
-            if (session != null)
-            {
-                Console.WriteLine($"Events lost: {session.EventsLost}");
-                session.Dispose();
-                session = null;
+                int eventsLost = 0;
+                if (eventProcessor != null)
+                {
+                    eventProcessor.Dispose();
+                }
+                if (session != null)
+                {
+                    eventsLost = session.EventsLost;
+                    session.Dispose();
+                    session = null;
+                }
+
+                if (!statsPrinted)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("{0,-30} {1}", "Processing end time:", DateTime.Now);
+                    Console.WriteLine("{0,-30} {1}", "Processing duration:", sessionStartStopwatch.Elapsed);
+                    Console.WriteLine("{0,-30} {1}", "Processed events:", processedEvents);
+                    Console.WriteLine("{0,-30} {1}", "Displayed events:", notFilteredEvents);
+                    Console.WriteLine("{0,-30} {1}", "Events lost:", eventsLost);
+                    statsPrinted = true;
+                }
             }
         }
 
@@ -143,8 +154,6 @@ namespace etrace
 
         private static void ProcessTrace(TraceEventDispatcher dispatcher)
         {
-            Console.WriteLine($"Session start time: {dispatcher.SessionStartTime}");
-
             dispatcher.Clr.All += ProcessEvent;
             dispatcher.Kernel.All += ProcessEvent;
             dispatcher.Dynamic.All += ProcessEvent;
