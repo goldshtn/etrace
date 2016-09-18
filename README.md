@@ -1,5 +1,7 @@
 ### Introduction
 
+[![Build status](https://ci.appveyor.com/api/projects/status/m5ycroyodt1xn49b?svg=true)](https://ci.appveyor.com/project/goldshtn/etrace)
+
 **etrace** is a command-line tool for realtime tracing of ETW events and for
 processing existing .etl recording files. It was inspired by the Microsoft
 [ELT](https://github.com/Microsoft/Microsoft.Diagnostics.Tracing.Logging/tree/master/utils/LogTool)
@@ -15,6 +17,12 @@ entire trace.
 > use yet. In fact, I am writing these lines after a talk for which I published
 > etrace on GitHub just so that I can mention it during the talk :-)
 > Contributions are very welcome!
+
+### Installation
+
+You can either compile etrace from source (Visual Studio 2015 required), or use
+the [precompiled binaries](https://ci.appveyor.com/project/goldshtn/etrace/build/artifacts)
+from AppVeyor.
 
 ### Examples
 
