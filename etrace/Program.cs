@@ -225,34 +225,55 @@ namespace etrace
                 string s = e.AsRawString();
                 if (options.ParsedRawFilter.IsMatch(s))
                 {
-                    eventProcessor.TakeEvent(e, s);
-                    ++notFilteredEvents;
+                    TakeEvent(e, s);
                 }
             }
             else if (options.ParsedFilters.Count > 0)
             {
                 foreach (var filter in options.ParsedFilters)
                 {
-                    string payloadName = filter.Key;
                     Regex valueRegex = filter.Value;
 
-                    object payloadValue = e.PayloadByName(payloadName);
-                    if (payloadValue == null)
-                        continue;
-
-                    if (valueRegex.IsMatch(payloadValue.ToString()))
+                    if (string.Equals(filter.Key, nameof(e.ProcessID), StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(valueRegex.ToString(), e.ProcessID.ToString())
+                        || string.Equals(filter.Key, nameof(e.ThreadID), StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(valueRegex.ToString(), e.ThreadID.ToString()))
                     {
-                        eventProcessor.TakeEvent(e);
-                        ++notFilteredEvents;
+                        TakeEvent(e);
                         break;
+                    }
+
+                    string payloadName = filter.Key;
+                    object payloadValue = e.PayloadByName(payloadName);
+
+                    if (payloadValue != null)
+                    {
+                        if (valueRegex.IsMatch(payloadValue.ToString()))
+                        {
+                            TakeEvent(e);
+                            break;
+                        }
                     }
                 }
             }
             else
             {
-                eventProcessor.TakeEvent(e);
-                ++notFilteredEvents;
+                TakeEvent(e);
             }
+        }
+
+        private static void TakeEvent(TraceEvent e, string description = null)
+        {
+            if (description != null)
+            {
+                eventProcessor.TakeEvent(e, description);
+            }
+            else
+            {
+                eventProcessor.TakeEvent(e);
+            }
+
+            ++notFilteredEvents;
         }
     }
 }
