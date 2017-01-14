@@ -210,8 +210,8 @@ Examples:
   etrace --file trace.etl --stats
   etrace --clr GC --event GC/Start --field PID,TID,Reason[12],Type
   etrace --kernel Process --event Process/Start --where ImageFileName=myapp
-  etrace --kernel Process --event --where ProcessName=myProcessName
-  etrace --kernel Process --event --where Thread/Start ProcessId=4
+  etrace --kernel Process --where ProcessName=myProcessName
+  etrace --kernel Process --event Thread/Stop --where ProcessId=4
   etrace --kernel Process --event Thread/Stop --where ThreadId=10272	
   etrace --clr GC --event GC/Start --duration 60
   etrace --other Microsoft-Windows-Win32k --event QueuePostMessage

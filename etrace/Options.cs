@@ -87,8 +87,8 @@ namespace etrace
             help.AddPostOptionsLine("  etrace --file trace.etl --stats");
             help.AddPostOptionsLine("  etrace --clr GC --event GC/Start --field PID,TID,Reason[12],Type");
             help.AddPostOptionsLine("  etrace --kernel Process --event Process/Start --where ImageFileName=myapp");
-            help.AddPostOptionsLine("  etrace --kernel Process --event --where ProcessId=4");
-            help.AddPostOptionsLine("  etrace --kernel Process --event --where ProcessName=myProcessName");
+            help.AddPostOptionsLine("  etrace --kernel Process --where ProcessId=4");
+            help.AddPostOptionsLine("  etrace --kernel Process --where ProcessName=myProcessName");	
             help.AddPostOptionsLine("  etrace --kernel Process --event Thread/Stop --where ThreadId=10272");
             help.AddPostOptionsLine("  etrace --clr GC --event GC/Start --duration 60");
             help.AddPostOptionsLine("  etrace --other Microsoft-Windows-Win32k --event QueuePostMessage");
