@@ -233,11 +233,11 @@ namespace etrace
                 foreach (var filter in options.ParsedFilters)
                 {
                     Regex valueRegex = filter.Value;
+                    string regexStr = valueRegex.ToString();
 
-                    if (string.Equals(filter.Key, nameof(e.ProcessID), StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(valueRegex.ToString(), e.ProcessID.ToString())
-                        || string.Equals(filter.Key, nameof(e.ThreadID), StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(valueRegex.ToString(), e.ThreadID.ToString()))
+                    if (CheckFilter(filter.Key, nameof(e.ProcessID), regexStr, e.ProcessID.ToString())
+                       || CheckFilter(filter.Key, nameof(e.ThreadID), regexStr, e.ThreadID.ToString())
+                       || CheckFilter(filter.Key, nameof(e.ProcessName), regexStr, e.ProcessName))
                     {
                         TakeEvent(e);
                         break;
@@ -260,6 +260,12 @@ namespace etrace
             {
                 TakeEvent(e);
             }
+        }
+
+        private static bool CheckFilter(string fiterKey, string eventKey, string filterValue, string eventValue)
+        {
+            return string.Equals(fiterKey, eventKey, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(filterValue, eventValue);
         }
 
         private static void TakeEvent(TraceEvent e, string description = null)
