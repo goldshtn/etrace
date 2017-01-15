@@ -4,18 +4,19 @@ using Microsoft.Diagnostics.Tracing.Parsers;
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using Microsoft.Diagnostics.Tracing;
 
 namespace etrace
 {
     [Flags]
-    enum ListFlags: int
+    enum ListFlags : int
     {
-        None       = 0x0,
-        Kernel     = 0x1,
-        CLR        = 0x2,
+        None = 0x0,
+        Kernel = 0x1,
+        CLR = 0x2,
         Registered = 0x4,
-        Published  = 0x8,
-        All        = Kernel | CLR | Registered | Published
+        Published = 0x8,
+        All = Kernel | CLR | Registered | Published
     }
 
     class Options
@@ -77,6 +78,8 @@ namespace etrace
             )]
         public int DurationInSeconds { get; set; } = 0;
 
+        public enum FilterType { AnyOff, AllOf }
+
         [HelpOption]
         public string Usage()
         {
@@ -88,7 +91,7 @@ namespace etrace
             help.AddPostOptionsLine("  etrace --clr GC --event GC/Start --field PID,TID,Reason[12],Type");
             help.AddPostOptionsLine("  etrace --kernel Process --event Process/Start --where ImageFileName=myapp");
             help.AddPostOptionsLine("  etrace --kernel Process --where ProcessId=4");
-            help.AddPostOptionsLine("  etrace --kernel Process --where ProcessName=myProcessName");	
+            help.AddPostOptionsLine("  etrace --kernel Process --where ProcessName=myProcessName");
             help.AddPostOptionsLine("  etrace --kernel Process --event Thread/Stop --where ThreadId=10272");
             help.AddPostOptionsLine("  etrace --clr GC --event GC/Start --duration 60");
             help.AddPostOptionsLine("  etrace --other Microsoft-Windows-Win32k --event QueuePostMessage");
@@ -100,11 +103,9 @@ namespace etrace
         {
             foreach (var filter in Filters)
             {
-                var parts = filter.Split('=');
-                if (parts.Length != 2)
-                    throw new ArgumentException($"Invalid filter: {filter}");
-
-                ParsedFilters.Add(parts[0], new Regex(parts[1], RegexOptions.Compiled));
+                var parsedFilter = ParseFilter(filter);
+                if (parsedFilter != null)
+                    ParsedFilters.Add(parsedFilter);
             }
 
             if (!String.IsNullOrEmpty(RawFilter))
@@ -120,6 +121,81 @@ namespace etrace
             }
         }
 
+        private ParsedFilter ParseFilter(string filter)
+        {
+            ParsedFilter result = null;
+
+            if (filter.Contains("&&"))
+            {
+                var subFilters = SplitMultipleFilter(filter, "&&");
+                result = new ParsedFilter(FilterType.AllOf);
+
+                foreach (var subFilter in subFilters)
+                {
+                    var paredFilter = ParseFilter(subFilter);
+                    result.SubFilters.Add(paredFilter);
+                }
+            }
+            else
+            {
+                if (filter.Contains(">="))
+                {
+                    result = ParseAnyOfFilter(filter, ">=");
+                }
+                if (filter.Contains("<="))
+                {
+                    result = ParseAnyOfFilter(filter, "<=");
+                }
+                if (filter.Contains(">"))
+                {
+                    result = ParseAnyOfFilter(filter, ">");
+                }
+                else if (filter.Contains("<"))
+                {
+                    result = ParseAnyOfFilter(filter, "<");
+                }
+                else
+                {
+                    result = ParseAnyOfFilter(filter, "=");
+                }
+            }
+
+            return result;
+        }
+
+        private string[] SplitMultipleFilter(string filter, string splitby)
+        {
+            filter = filter.Replace(" ", "");
+            string[] result = filter.Split(new string[] { splitby }, StringSplitOptions.RemoveEmptyEntries);
+
+            if (result.Length == 1)
+                throw new ArgumentException($"Invalid filter: {filter}");
+
+            return result;
+
+        }
+
+        private ParsedFilter ParseAnyOfFilter(string filter, string @operator)
+        {
+            var splited = SplitBinaryFilter(filter, @operator);
+            return new ParsedFilter(splited[0], splited[1], @operator);
+        }
+
+
+        private string[] SplitBinaryFilter(string filter, string split)
+        {
+            string[] result = filter.Split(new string[] { split }, StringSplitOptions.RemoveEmptyEntries);
+
+            if (result.Length != 2)
+                throw new ArgumentException($"Invalid filter: {filter}");
+
+            result[0] = result[0].Replace(" ", "");
+            result[1] = result[1].Replace(" ", "");
+
+            return result;
+        }
+
+
         // TODO LINQ-like filter, e.g. `e["Duration"] > 1000 && e.ProcessName == "notepad"`,
         //      potentially also with `select new { ... }` which is what we print
 
@@ -128,10 +204,124 @@ namespace etrace
 
         // TODO Filters with greater-than or less-than operators
 
-        public Dictionary<string, Regex> ParsedFilters { get; } = new Dictionary<string, Regex>();
+        public List<ParsedFilter> ParsedFilters { get; } = new List<ParsedFilter>();
+
         public Regex ParsedRawFilter { get; private set; }
         public bool IsFileSession => !String.IsNullOrEmpty(File);
         public long ParsedClrKeywords { get; private set; } = 0;
         public KernelTraceEventParser.Keywords ParsedKernelKeywords { get; private set; } = KernelTraceEventParser.Keywords.None;
+
+        public class ParsedFilter
+        {
+            public ParsedFilter(string key, string value, string operatorChar) : this(FilterType.AnyOff)
+            {
+                Key = key.Replace(" ", "");
+                RawValue = value;
+                OperatorChar = operatorChar;
+                Value = Value = new Regex(value, RegexOptions.Compiled);
+            }
+
+            public ParsedFilter(FilterType type)
+            {
+                ParsedType = type;
+
+                if (type == FilterType.AllOf)
+                    SubFilters = new List<ParsedFilter>();
+            }
+
+            public FilterType ParsedType { get; set; }
+            public List<ParsedFilter> SubFilters { get; set; }
+            public string Key { get; private set; }
+            public Regex Value { get; private set; }
+            public string RawValue { get; private set; }
+            public string OperatorChar { get; private set; }
+
+            public bool IsMatch(string key, string value)
+            {
+                bool result = false;
+                if (CompareString(Key, key))
+                {
+                    if (OperatorChar == ">")
+                    {
+                        result = int.Parse(RawValue) < int.Parse(value);
+                    }
+                    else if (OperatorChar == "<")
+                    {
+                        result = int.Parse(RawValue) > int.Parse(value);
+                    }
+                    else if (OperatorChar == "<=")
+                    {
+                        result = int.Parse(RawValue) >= int.Parse(value);
+                    }
+                    else if (OperatorChar == ">=")
+                    {
+                        result = int.Parse(RawValue) <= int.Parse(value);
+                    }
+                    else
+                    {
+
+                        result = CompareString(Key, key) && CompareString(RawValue, value);
+                    }
+                }
+
+
+                return result;
+            }
+
+            private bool CompareString(string str1, string str2)
+            {
+                return string.Equals(str1.Replace(" ", ""), str2.Replace(" ", ""), StringComparison.OrdinalIgnoreCase);
+            }
+
+            internal bool IsMatch(TraceEvent e)
+            {
+                bool result = true;
+
+                if (this.ParsedType == FilterType.AnyOff)
+                {
+                    result = IsMatchAnyOff(e, this);
+                }
+                else
+                {
+                    foreach (var subFilter in SubFilters)
+                    {
+                        if (!IsMatchAnyOff(e, subFilter))
+                        {
+                            result = false;
+                            break;
+                        }
+                    }
+                }
+
+                return result;
+            }
+
+            private bool IsMatchAnyOff(TraceEvent e, ParsedFilter filter)
+            {
+                bool result = false;
+
+                if (filter.IsMatch(nameof(e.ProcessID), e.ProcessID.ToString())
+                    || filter.IsMatch(nameof(e.ThreadID), e.ThreadID.ToString())
+                    || filter.IsMatch(nameof(e.ProcessName), e.ProcessName))
+                {
+                    result = true;
+                }
+                else
+                {
+                    object payloadValue = e.PayloadByName(filter.Key);
+
+                    if (payloadValue != null)
+                    {
+                        if (filter.Value.IsMatch(payloadValue.ToString()))
+                        {
+                            result = true;
+                        }
+                    }
+                }
+
+                return result;
+            }
+        }
     }
 }
+

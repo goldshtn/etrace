@@ -232,27 +232,10 @@ namespace etrace
             {
                 foreach (var filter in options.ParsedFilters)
                 {
-                    Regex valueRegex = filter.Value;
-                    string regexStr = valueRegex.ToString();
-
-                    if (CheckFilter(filter.Key, nameof(e.ProcessID), regexStr, e.ProcessID.ToString())
-                       || CheckFilter(filter.Key, nameof(e.ThreadID), regexStr, e.ThreadID.ToString())
-                       || CheckFilter(filter.Key, nameof(e.ProcessName), regexStr, e.ProcessName))
+                    if (filter.IsMatch(e))
                     {
                         TakeEvent(e);
                         break;
-                    }
-
-                    string payloadName = filter.Key;
-                    object payloadValue = e.PayloadByName(payloadName);
-
-                    if (payloadValue != null)
-                    {
-                        if (valueRegex.IsMatch(payloadValue.ToString()))
-                        {
-                            TakeEvent(e);
-                            break;
-                        }
                     }
                 }
             }
@@ -260,6 +243,11 @@ namespace etrace
             {
                 TakeEvent(e);
             }
+        }
+
+        private static bool CheckFilter(string key, string v1, object rawValue, string v2)
+        {
+            throw new NotImplementedException();
         }
 
         private static bool CheckFilter(string fiterKey, string eventKey, string filterValue, string eventValue)
