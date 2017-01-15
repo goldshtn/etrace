@@ -9,7 +9,7 @@ namespace etrace
         public static string AsRawString(this TraceEvent e)
         {
             var sb = new StringBuilder();
-            sb.Append($"{e.EventName} [PID={e.ProcessID} TID={e.ThreadID} TIME={e.TimeStamp}]");
+            sb.Append($"{e.EventName} [PNAME={e.ProcessName} PID={e.ProcessID} TID={e.ThreadID} TIME={e.TimeStamp}]");
             for (int i = 0; i < e.PayloadNames.Length; ++i)
             {
                 try
