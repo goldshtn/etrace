@@ -91,9 +91,11 @@ namespace etrace
             help.AddPostOptionsLine("  etrace --kernel Process --where ProcessId=4");
             help.AddPostOptionsLine("  etrace --kernel Process --where ProcessName=myProcessName");
             help.AddPostOptionsLine("  etrace --kernel Process --event Thread/Stop --where ThreadId=10272");
+            help.AddPostOptionsLine("  etrace --kernel Process --event --where \"ThreadId=1999 && ProcessId=4\"");
             help.AddPostOptionsLine("  etrace --clr GC --event GC/Start --duration 60");
             help.AddPostOptionsLine("  etrace --other Microsoft-Windows-Win32k --event QueuePostMessage");
             help.AddPostOptionsLine("  etrace --list CLR,Kernel");
+
             return help.ToString();
         }
 
@@ -118,33 +120,38 @@ namespace etrace
                 ParsedKernelKeywords |= (KernelTraceEventParser.Keywords)Enum.Parse(typeof(KernelTraceEventParser.Keywords), keyword);
             }
         }
-        private ParsedFilter ParseFilter(string filter)
-        {
-            ParsedFilter result = null;
 
-            if (filter.Contains(ParsedFilter.MULTIPLE_FILTER_SIGN))
+        #region Filter Parsing 
+
+        private Filter ParseFilter(string filter)
+        {
+            Filter result = null;
+
+            if (filter.Contains(MultipleFilter.MULTIPLE_FILTER_SIGN))
             {
-                var subFilters = SplitMultipleFilter(filter, ParsedFilter.MULTIPLE_FILTER_SIGN);
-                result = new ParsedFilter(ParsedFilter.FilterType.MultipleFilter);
+                var subFilters = SplitMultipleFilter(filter, MultipleFilter.MULTIPLE_FILTER_SIGN);
+                MultipleFilter multiFilter = new MultipleFilter();
 
                 foreach (var subFilter in subFilters)
                 {
                     var paredFilter = ParseFilter(subFilter);
-                    result.SubFilters.Add(paredFilter);
+                    multiFilter.SubFilters.Add(paredFilter);
                 }
+
+                result = multiFilter;
             }
             else
             {
-                if (filter.Contains(ParsedFilter.GREATER_EQUAL_SIGN))
-                    result = ParseAnyOfFilter(filter, ParsedFilter.GREATER_EQUAL_SIGN);
-                if (filter.Contains(ParsedFilter.LESS_EQUAL_SIGN))
-                    result = ParseAnyOfFilter(filter, ParsedFilter.LESS_EQUAL_SIGN);
-                if (filter.Contains(ParsedFilter.GREATER_SIGN))
-                    result = ParseAnyOfFilter(filter, ParsedFilter.GREATER_SIGN);
-                else if (filter.Contains(ParsedFilter.LESS_SIGN))
-                    result = ParseAnyOfFilter(filter, ParsedFilter.LESS_SIGN);
+                if (filter.Contains(Filter.GREATER_EQUAL_SIGN))
+                    result = ParseAnyOfFilter(filter, Filter.GREATER_EQUAL_SIGN);
+                if (filter.Contains(Filter.LESS_EQUAL_SIGN))
+                    result = ParseAnyOfFilter(filter, Filter.LESS_EQUAL_SIGN);
+                if (filter.Contains(Filter.GREATER_SIGN))
+                    result = ParseAnyOfFilter(filter, Filter.GREATER_SIGN);
+                else if (filter.Contains(Filter.LESS_SIGN))
+                    result = ParseAnyOfFilter(filter, Filter.LESS_SIGN);
                 else
-                    result = ParseAnyOfFilter(filter, ParsedFilter.EQUAL_SIGN);
+                    result = ParseAnyOfFilter(filter, Filter.EQUAL_SIGN);
             }
 
             return result;
@@ -159,20 +166,12 @@ namespace etrace
                 throw new ArgumentException($"Invalid filter: {filter}");
 
             return result;
-
         }
 
-        private ParsedFilter ParseAnyOfFilter(string filter, string @operator)
-        {
-            var splited = SplitBinaryFilter(filter, @operator);
-            return new ParsedFilter(splited[0], splited[1], @operator);
-        }
-
-
-        private string[] SplitBinaryFilter(string filter, string split)
+        private string[] SplitBinaryFilter(string filter, string splitby)
         {
             filter = filter.Replace(" ", "");
-            string[] result = filter.Split(new string[] { split }, StringSplitOptions.RemoveEmptyEntries);
+            string[] result = filter.Split(new string[] { splitby }, StringSplitOptions.RemoveEmptyEntries);
 
             if (result.Length != 2)
                 throw new ArgumentException($"Invalid filter: {filter}");
@@ -180,6 +179,13 @@ namespace etrace
             return result;
         }
 
+        private Filter ParseAnyOfFilter(string filter, string @operator)
+        {
+            var splited = SplitBinaryFilter(filter, @operator);
+            return new Filter(splited[0], splited[1], @operator);
+        }
+
+        #endregion
 
         // TODO LINQ-like filter, e.g. `e["Duration"] > 1000 && e.ProcessName == "notepad"`,
         //      potentially also with `select new { ... }` which is what we print
@@ -187,18 +193,50 @@ namespace etrace
         // TODO Something that operates on event pairs, Event/Start and Event/Stop, and then
         //      allows queries on duration
 
-        // TODO Filters with greater-than or less-than operators
-
-        public List<ParsedFilter> ParsedFilters { get; } = new List<ParsedFilter>();
+        public List<Filter> ParsedFilters { get; } = new List<Filter>();
         public Regex ParsedRawFilter { get; private set; }
         public bool IsFileSession => !String.IsNullOrEmpty(File);
         public long ParsedClrKeywords { get; private set; } = 0;
         public KernelTraceEventParser.Keywords ParsedKernelKeywords { get; private set; } = KernelTraceEventParser.Keywords.None;
 
 
-        public class ParsedFilter
+        public class MultipleFilter : Filter
         {
             internal const string MULTIPLE_FILTER_SIGN = "&&";
+
+            internal MultipleFilter() : base ()
+            {
+                SubFilters = new List<Filter>();
+            }
+
+            public List<Filter> SubFilters { get; set; }
+
+            /// <summary>
+            ///  Checks whether all sub-filters matches the event
+            /// </summary>
+            /// <param name="e">event</param>
+            /// <returns>true if all of sub-filters match the event</returns>
+            internal override bool IsMatch(TraceEvent e)
+            {
+                bool result = true;
+
+                foreach (var subFilter in SubFilters)
+                {
+                    if (!subFilter.IsMatch(e))
+                    {
+                        result = false;
+                        break;
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        public class Filter
+        {
+            #region Const Signs
+
             internal const string GREATER_EQUAL_SIGN = ">=";
             internal const string GREATER_SIGN = ">";
             internal const string LESS_EQUAL_SIGN = "<=";
@@ -206,49 +244,70 @@ namespace etrace
             internal const string EQUAL_SIGN = "=";
             internal const string DOUBLE_EQUAL_SIGN = "==";
 
-            public enum FilterType { MultipleFilter, SingleFilter}
+            #endregion
 
-            public ParsedFilter(string key, string value, string operatorChar) : this(FilterType.MultipleFilter)
+            protected Filter()
             {
-                Key = key.Replace(" ", "");
+
+            }
+
+            public Filter(string key, string value, string operatorChar)
+            {
+                Key = key;
                 RawValue = value;
                 OperatorChar = operatorChar;
                 Value = Value = new Regex(value, RegexOptions.Compiled);
             }
 
-            public ParsedFilter(FilterType type)
-            {
-                ParsedType = type;
+            #region Propeties
 
-                if (type == FilterType.MultipleFilter)
-                    SubFilters = new List<ParsedFilter>();
-            }
-
-            public FilterType ParsedType { get; set; }
-            public List<ParsedFilter> SubFilters { get; set; }
             public string Key { get; private set; }
             public Regex Value { get; private set; }
             public string RawValue { get; private set; }
             public string OperatorChar { get; private set; }
 
-            public bool IsMatch(string key, string value)
+            #endregion
+
+            #region Match Methods
+
+            /// <summary>
+            ///  Checks whether given filter match event.
+            /// </summary>
+            /// <param name="e">event</param>
+            /// <returns>true if filter matches the event</returns>
+            internal virtual bool IsMatch(TraceEvent e)
+            {
+                return IsMatchAny(e) || IsPayloadMatch(e);
+            }
+
+            /// <summary>
+            ///  Checks by OperatorChar if filter matches event 
+            /// </summary>
+            /// <returns>true if matches the event</returns>
+            private bool IsMatch(string key, string value)
             {
                 bool result = false;
-                if (CompareString(Key, key))
+
+                if (string.Equals(this.Key, key, StringComparison.OrdinalIgnoreCase))
                 {
                     switch (OperatorChar)
                     {
-                        case  ParsedFilter.GREATER_SIGN:
-                            result = int.Parse(RawValue) < int.Parse(value); break;
-                        case ParsedFilter.LESS_SIGN:
-                            result = int.Parse(RawValue) > int.Parse(value); break;
-                        case ParsedFilter.LESS_EQUAL_SIGN:
-                            result = int.Parse(RawValue) >= int.Parse(value); break;
-                        case ParsedFilter.GREATER_EQUAL_SIGN:
-                            result = int.Parse(RawValue) <= int.Parse(value); break;
-                        case ParsedFilter.EQUAL_SIGN:
-                        case ParsedFilter.DOUBLE_EQUAL_SIGN:
-                            result = CompareString(RawValue, value); break;
+                        case GREATER_SIGN:
+                            result = int.Parse(this.RawValue) < int.Parse(value);
+                            break;
+                        case LESS_SIGN:
+                            result = int.Parse(this.RawValue) > int.Parse(value);
+                            break;
+                        case LESS_EQUAL_SIGN:
+                            result = int.Parse(this.RawValue) >= int.Parse(value);
+                            break;
+                        case GREATER_EQUAL_SIGN:
+                            result = int.Parse(this.RawValue) <= int.Parse(value);
+                            break;
+                        case EQUAL_SIGN:
+                        case DOUBLE_EQUAL_SIGN:
+                            result = string.Equals(this.RawValue, value, StringComparison.OrdinalIgnoreCase);
+                            break;
                         default: break;
                     }
                 }
@@ -256,64 +315,38 @@ namespace etrace
                 return result;
             }
 
-            private bool CompareString(string str1, string str2)
-            {
-                return string.Equals(str1.Replace(" ", ""), str2.Replace(" ", ""), StringComparison.OrdinalIgnoreCase);
-            }
-
-            internal bool IsMatch(TraceEvent e)
-            {
-                bool result = true;
-
-                if (ParsedType != FilterType.MultipleFilter)
-                {
-                    result = IsMatch(e, this);
-                }
-                else
-                {
-                    foreach (var subFilter in SubFilters)
-                    {
-                        if (!IsMatch(e, subFilter))
-                        {
-                            result = false;
-                            break;
-                        }
-                    }
-                }
-
-                return result;
-            }
-
-            private bool IsMatch(TraceEvent e, ParsedFilter filter)
-            {
-                return IsMatchAny(filter, e) || IsPayloadMatch(filter, e);
-            }
-
-            private bool IsPayloadMatch(ParsedFilter filter, TraceEvent e)
+            /// <summary>
+            /// Checks if filter matches event payload - by filter key
+            /// </summary>
+            /// <returns>true if filter matches the event</returns>
+            private bool IsPayloadMatch(TraceEvent e)
             {
                 bool result = false;
 
-                object payloadValue = e.PayloadByName(filter.Key);
+                object payloadValue = e.PayloadByName(Key);
 
                 if (payloadValue != null)
                 {
-                    result = filter.Value.IsMatch(payloadValue.ToString());
+                    result = Value.IsMatch(payloadValue.ToString());
                 }
 
                 return result;
             }
 
             /// <summary>
-            /// Checks whether given filter matches event.
+            /// Checks whether given filter match event.
             /// Suported filters : ProcessID, ThreadID, ProcessName
             /// </summary>
-            /// <returns></returns>
-            private bool IsMatchAny(ParsedFilter filter, TraceEvent e)
+            /// <returns>true if filter matches the event</returns>
+            private bool IsMatchAny(TraceEvent e)
             {
-                return filter.IsMatch(nameof(e.ProcessID), e.ProcessID.ToString())
-                    || filter.IsMatch(nameof(e.ThreadID), e.ThreadID.ToString())
-                    || filter.IsMatch(nameof(e.ProcessName), e.ProcessName);
+                return IsMatch(nameof(e.ProcessID), e.ProcessID.ToString())
+                    || IsMatch(nameof(e.ThreadID), e.ThreadID.ToString())
+                    || IsMatch(nameof(e.ProcessName), e.ProcessName);
             }
+
+            #endregion
+
         }
     }
 }

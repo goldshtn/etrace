@@ -5,7 +5,6 @@ using Microsoft.Diagnostics.Tracing.Session;
 using System;
 using System.Diagnostics;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace etrace
