@@ -284,7 +284,7 @@ namespace etrace
             }
 
             /// <summary>
-            ///  Checks by OperatorChar if filter matches event 
+            ///  Checks if given key ad value match filter ( by OperatorChar )
             /// </summary>
             /// <returns>true if matches the event</returns>
             private bool IsMatch(string key, string value)
