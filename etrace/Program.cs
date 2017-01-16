@@ -245,17 +245,6 @@ namespace etrace
             }
         }
 
-        private static bool CheckFilter(string key, string v1, object rawValue, string v2)
-        {
-            throw new NotImplementedException();
-        }
-
-        private static bool CheckFilter(string fiterKey, string eventKey, string filterValue, string eventValue)
-        {
-            return string.Equals(fiterKey, eventKey, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(filterValue, eventValue);
-        }
-
         private static void TakeEvent(TraceEvent e, string description = null)
         {
             if (description != null)

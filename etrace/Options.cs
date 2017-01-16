@@ -78,8 +78,6 @@ namespace etrace
             )]
         public int DurationInSeconds { get; set; } = 0;
 
-        public enum FilterType { AnyOff, AllOf }
-
         [HelpOption]
         public string Usage()
         {
@@ -120,15 +118,14 @@ namespace etrace
                 ParsedKernelKeywords |= (KernelTraceEventParser.Keywords)Enum.Parse(typeof(KernelTraceEventParser.Keywords), keyword);
             }
         }
-
         private ParsedFilter ParseFilter(string filter)
         {
             ParsedFilter result = null;
 
-            if (filter.Contains("&&"))
+            if (filter.Contains(ParsedFilter.MULTIPLE_FILTER_SIGN))
             {
-                var subFilters = SplitMultipleFilter(filter, "&&");
-                result = new ParsedFilter(FilterType.AllOf);
+                var subFilters = SplitMultipleFilter(filter, ParsedFilter.MULTIPLE_FILTER_SIGN);
+                result = new ParsedFilter(ParsedFilter.FilterType.MultipleFilter);
 
                 foreach (var subFilter in subFilters)
                 {
@@ -138,26 +135,16 @@ namespace etrace
             }
             else
             {
-                if (filter.Contains(">="))
-                {
-                    result = ParseAnyOfFilter(filter, ">=");
-                }
-                if (filter.Contains("<="))
-                {
-                    result = ParseAnyOfFilter(filter, "<=");
-                }
-                if (filter.Contains(">"))
-                {
-                    result = ParseAnyOfFilter(filter, ">");
-                }
-                else if (filter.Contains("<"))
-                {
-                    result = ParseAnyOfFilter(filter, "<");
-                }
+                if (filter.Contains(ParsedFilter.GREATER_EQUAL_SIGN))
+                    result = ParseAnyOfFilter(filter, ParsedFilter.GREATER_EQUAL_SIGN);
+                if (filter.Contains(ParsedFilter.LESS_EQUAL_SIGN))
+                    result = ParseAnyOfFilter(filter, ParsedFilter.LESS_EQUAL_SIGN);
+                if (filter.Contains(ParsedFilter.GREATER_SIGN))
+                    result = ParseAnyOfFilter(filter, ParsedFilter.GREATER_SIGN);
+                else if (filter.Contains(ParsedFilter.LESS_SIGN))
+                    result = ParseAnyOfFilter(filter, ParsedFilter.LESS_SIGN);
                 else
-                {
-                    result = ParseAnyOfFilter(filter, "=");
-                }
+                    result = ParseAnyOfFilter(filter, ParsedFilter.EQUAL_SIGN);
             }
 
             return result;
@@ -184,13 +171,11 @@ namespace etrace
 
         private string[] SplitBinaryFilter(string filter, string split)
         {
+            filter = filter.Replace(" ", "");
             string[] result = filter.Split(new string[] { split }, StringSplitOptions.RemoveEmptyEntries);
 
             if (result.Length != 2)
                 throw new ArgumentException($"Invalid filter: {filter}");
-
-            result[0] = result[0].Replace(" ", "");
-            result[1] = result[1].Replace(" ", "");
 
             return result;
         }
@@ -205,15 +190,25 @@ namespace etrace
         // TODO Filters with greater-than or less-than operators
 
         public List<ParsedFilter> ParsedFilters { get; } = new List<ParsedFilter>();
-
         public Regex ParsedRawFilter { get; private set; }
         public bool IsFileSession => !String.IsNullOrEmpty(File);
         public long ParsedClrKeywords { get; private set; } = 0;
         public KernelTraceEventParser.Keywords ParsedKernelKeywords { get; private set; } = KernelTraceEventParser.Keywords.None;
 
+
         public class ParsedFilter
         {
-            public ParsedFilter(string key, string value, string operatorChar) : this(FilterType.AnyOff)
+            internal const string MULTIPLE_FILTER_SIGN = "&&";
+            internal const string GREATER_EQUAL_SIGN = ">=";
+            internal const string GREATER_SIGN = ">";
+            internal const string LESS_EQUAL_SIGN = "<=";
+            internal const string LESS_SIGN = "<";
+            internal const string EQUAL_SIGN = "=";
+            internal const string DOUBLE_EQUAL_SIGN = "==";
+
+            public enum FilterType { MultipleFilter, SingleFilter}
+
+            public ParsedFilter(string key, string value, string operatorChar) : this(FilterType.MultipleFilter)
             {
                 Key = key.Replace(" ", "");
                 RawValue = value;
@@ -225,7 +220,7 @@ namespace etrace
             {
                 ParsedType = type;
 
-                if (type == FilterType.AllOf)
+                if (type == FilterType.MultipleFilter)
                     SubFilters = new List<ParsedFilter>();
             }
 
@@ -241,29 +236,22 @@ namespace etrace
                 bool result = false;
                 if (CompareString(Key, key))
                 {
-                    if (OperatorChar == ">")
+                    switch (OperatorChar)
                     {
-                        result = int.Parse(RawValue) < int.Parse(value);
-                    }
-                    else if (OperatorChar == "<")
-                    {
-                        result = int.Parse(RawValue) > int.Parse(value);
-                    }
-                    else if (OperatorChar == "<=")
-                    {
-                        result = int.Parse(RawValue) >= int.Parse(value);
-                    }
-                    else if (OperatorChar == ">=")
-                    {
-                        result = int.Parse(RawValue) <= int.Parse(value);
-                    }
-                    else
-                    {
-
-                        result = CompareString(Key, key) && CompareString(RawValue, value);
+                        case  ParsedFilter.GREATER_SIGN:
+                            result = int.Parse(RawValue) < int.Parse(value); break;
+                        case ParsedFilter.LESS_SIGN:
+                            result = int.Parse(RawValue) > int.Parse(value); break;
+                        case ParsedFilter.LESS_EQUAL_SIGN:
+                            result = int.Parse(RawValue) >= int.Parse(value); break;
+                        case ParsedFilter.GREATER_EQUAL_SIGN:
+                            result = int.Parse(RawValue) <= int.Parse(value); break;
+                        case ParsedFilter.EQUAL_SIGN:
+                        case ParsedFilter.DOUBLE_EQUAL_SIGN:
+                            result = CompareString(RawValue, value); break;
+                        default: break;
                     }
                 }
-
 
                 return result;
             }
@@ -277,15 +265,15 @@ namespace etrace
             {
                 bool result = true;
 
-                if (this.ParsedType == FilterType.AnyOff)
+                if (ParsedType != FilterType.MultipleFilter)
                 {
-                    result = IsMatchAnyOff(e, this);
+                    result = IsMatch(e, this);
                 }
                 else
                 {
                     foreach (var subFilter in SubFilters)
                     {
-                        if (!IsMatchAnyOff(e, subFilter))
+                        if (!IsMatch(e, subFilter))
                         {
                             result = false;
                             break;
@@ -296,30 +284,35 @@ namespace etrace
                 return result;
             }
 
-            private bool IsMatchAnyOff(TraceEvent e, ParsedFilter filter)
+            private bool IsMatch(TraceEvent e, ParsedFilter filter)
+            {
+                return IsMatchAny(filter, e) || IsPayloadMatch(filter, e);
+            }
+
+            private bool IsPayloadMatch(ParsedFilter filter, TraceEvent e)
             {
                 bool result = false;
 
-                if (filter.IsMatch(nameof(e.ProcessID), e.ProcessID.ToString())
-                    || filter.IsMatch(nameof(e.ThreadID), e.ThreadID.ToString())
-                    || filter.IsMatch(nameof(e.ProcessName), e.ProcessName))
-                {
-                    result = true;
-                }
-                else
-                {
-                    object payloadValue = e.PayloadByName(filter.Key);
+                object payloadValue = e.PayloadByName(filter.Key);
 
-                    if (payloadValue != null)
-                    {
-                        if (filter.Value.IsMatch(payloadValue.ToString()))
-                        {
-                            result = true;
-                        }
-                    }
+                if (payloadValue != null)
+                {
+                    result = filter.Value.IsMatch(payloadValue.ToString());
                 }
 
                 return result;
+            }
+
+            /// <summary>
+            /// Checks whether given filter matches event.
+            /// Suported filters : ProcessID, ThreadID, ProcessName
+            /// </summary>
+            /// <returns></returns>
+            private bool IsMatchAny(ParsedFilter filter, TraceEvent e)
+            {
+                return filter.IsMatch(nameof(e.ProcessID), e.ProcessID.ToString())
+                    || filter.IsMatch(nameof(e.ThreadID), e.ThreadID.ToString())
+                    || filter.IsMatch(nameof(e.ProcessName), e.ProcessName);
             }
         }
     }
