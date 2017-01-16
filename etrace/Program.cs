@@ -232,42 +232,11 @@ namespace etrace
                 foreach (var filter in options.ParsedFilters)
                 {
                     if (filter.IsMatch(e))
-                    string regexStr = valueRegex.ToString();
-
-                    if (CheckFilter(filter.Key, nameof(e.ProcessID), regexStr, e.ProcessID.ToString())
-                       || CheckFilter(filter.Key, nameof(e.ThreadID), regexStr, e.ThreadID.ToString())
-                       || CheckFilter(filter.Key, nameof(e.ProcessName), regexStr, e.ProcessName))
                     {
                         TakeEvent(e);
                         break;
                     }
-                    string payloadName = filter.Key;
-                    if (payloadValue != null)
-                    {
-                        {
-                        TakeEvent(e);
-                            break;
-                        }
-                    }
                 }
-            }
-            else
-            {
-                TakeEvent(e);
-            }
-        }
-
-        private static bool CheckFilter(string fiterKey, string eventKey, string filterValue, string eventValue)
-        {
-            return string.Equals(fiterKey, eventKey, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(filterValue, eventValue);
-        }
-
-        private static void TakeEvent(TraceEvent e, string description = null)
-        {
-            if (description != null)
-            {
-                eventProcessor.TakeEvent(e, description);
             }
             else
             {
