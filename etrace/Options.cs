@@ -9,14 +9,14 @@ using Microsoft.Diagnostics.Tracing;
 namespace etrace
 {
     [Flags]
-    enum ListFlags : int
+	enum ListFlags: int
     {
-        None = 0x0,
-        Kernel = 0x1,
-        CLR = 0x2,
+        None       = 0x0,
+        Kernel     = 0x1,
+        CLR        = 0x2,
         Registered = 0x4,
-        Published = 0x8,
-        All = Kernel | CLR | Registered | Published
+        Published  = 0x8,
+        All        = Kernel | CLR | Registered | Published
     }
 
     class Options
@@ -142,14 +142,16 @@ namespace etrace
             }
             else
             {
-                if (filter.Contains(Filter.GREATER_EQUAL_SIGN))
-                    result = ParseAnyOfFilter(filter, Filter.GREATER_EQUAL_SIGN);
-                if (filter.Contains(Filter.LESS_EQUAL_SIGN))
-                    result = ParseAnyOfFilter(filter, Filter.LESS_EQUAL_SIGN);
+                if (filter.Contains(Filter.GREATER_OR_EQUAL_SIGN))
+                    result = ParseAnyOfFilter(filter, Filter.GREATER_OR_EQUAL_SIGN);
+                if (filter.Contains(Filter.LESS_OR_EQUAL_SIGN))
+                    result = ParseAnyOfFilter(filter, Filter.LESS_OR_EQUAL_SIGN);
                 if (filter.Contains(Filter.GREATER_SIGN))
                     result = ParseAnyOfFilter(filter, Filter.GREATER_SIGN);
                 else if (filter.Contains(Filter.LESS_SIGN))
                     result = ParseAnyOfFilter(filter, Filter.LESS_SIGN);
+                else if (filter.Contains(Filter.NOT_EQUAL_SIGN))
+                    result = ParseAnyOfFilter(filter, Filter.NOT_EQUAL_SIGN);
                 else
                     result = ParseAnyOfFilter(filter, Filter.EQUAL_SIGN);
             }
@@ -237,13 +239,14 @@ namespace etrace
         {
             #region Const Signs
 
-            internal const string GREATER_EQUAL_SIGN = ">=";
+            internal const string GREATER_OR_EQUAL_SIGN = ">=";
             internal const string GREATER_SIGN = ">";
-            internal const string LESS_EQUAL_SIGN = "<=";
+            internal const string LESS_OR_EQUAL_SIGN = "<=";
             internal const string LESS_SIGN = "<";
             internal const string EQUAL_SIGN = "=";
+            internal const string NOT_EQUAL_SIGN = "!=";
             internal const string DOUBLE_EQUAL_SIGN = "==";
-
+            
             #endregion
 
             protected Filter()
@@ -298,11 +301,14 @@ namespace etrace
                         case LESS_SIGN:
                             result = int.Parse(this.RawValue) > int.Parse(value);
                             break;
-                        case LESS_EQUAL_SIGN:
+                        case LESS_OR_EQUAL_SIGN:
                             result = int.Parse(this.RawValue) >= int.Parse(value);
                             break;
-                        case GREATER_EQUAL_SIGN:
+                        case GREATER_OR_EQUAL_SIGN:
                             result = int.Parse(this.RawValue) <= int.Parse(value);
+                            break;
+                        case NOT_EQUAL_SIGN:
+                            result = int.Parse(this.RawValue) != int.Parse(value);
                             break;
                         case EQUAL_SIGN:
                         case DOUBLE_EQUAL_SIGN:
