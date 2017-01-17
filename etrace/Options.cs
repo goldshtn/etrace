@@ -10,7 +10,7 @@ using Microsoft.Diagnostics.Tracing;
 namespace etrace
 {
     [Flags]
-	enum ListFlags: int
+    enum ListFlags: int
     {
         None       = 0x0,
         Kernel     = 0x1,
