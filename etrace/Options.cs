@@ -2,6 +2,7 @@
 using CommandLine.Text;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using Microsoft.Diagnostics.Tracing;
@@ -213,25 +214,9 @@ namespace etrace
 
             public List<Filter> SubFilters { get; set; }
 
-            /// <summary>
-            ///  Checks whether all sub-filters matches the event
-            /// </summary>
-            /// <param name="e">event</param>
-            /// <returns>true if all of sub-filters match the event</returns>
             internal override bool IsMatch(TraceEvent e)
             {
-                bool result = true;
-
-                foreach (var subFilter in SubFilters)
-                {
-                    if (!subFilter.IsMatch(e))
-                    {
-                        result = false;
-                        break;
-                    }
-                }
-
-                return result;
+                return SubFilters.All(s => s.IsMatch(e));
             }
         }
 
@@ -321,10 +306,6 @@ namespace etrace
                 return result;
             }
 
-            /// <summary>
-            /// Checks if filter matches event payload - by filter key
-            /// </summary>
-            /// <returns>true if filter matches the event</returns>
             private bool IsPayloadMatch(TraceEvent e)
             {
                 bool result = false;
@@ -356,4 +337,3 @@ namespace etrace
         }
     }
 }
-
