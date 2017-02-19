@@ -213,6 +213,7 @@ Examples:
   etrace --kernel Process --where ProcessName=myProcessName
   etrace --kernel Process --event Thread/Stop --where ProcessId=4
   etrace --kernel Process --event Thread/Stop --where ThreadId=10272	
+  etrace --kernel Process --event --where "ThreadId > 1 && ProcessName=git-lfs"
   etrace --clr GC --event GC/Start --duration 60
   etrace --other Microsoft-Windows-Win32k --event QueuePostMessage
   etrace --list CLR,Kernel

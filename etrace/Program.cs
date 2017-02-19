@@ -5,7 +5,6 @@ using Microsoft.Diagnostics.Tracing.Session;
 using System;
 using System.Diagnostics;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace etrace
@@ -232,40 +231,20 @@ namespace etrace
             {
                 foreach (var filter in options.ParsedFilters)
                 {
-                    Regex valueRegex = filter.Value;
-                    string regexStr = valueRegex.ToString();
-
-                    if (CheckFilter(filter.Key, nameof(e.ProcessID), regexStr, e.ProcessID.ToString())
-                       || CheckFilter(filter.Key, nameof(e.ThreadID), regexStr, e.ThreadID.ToString())
-                       || CheckFilter(filter.Key, nameof(e.ProcessName), regexStr, e.ProcessName))
+                    if (filter.IsMatch(e))
                     {
                         TakeEvent(e);
                         break;
-                    }
-
-                    string payloadName = filter.Key;
-                    object payloadValue = e.PayloadByName(payloadName);
-
-                    if (payloadValue != null)
-                    {
-                        if (valueRegex.IsMatch(payloadValue.ToString()))
-                        {
-                            TakeEvent(e);
-                            break;
-                        }
                     }
                 }
             }
             else
             {
+
+            }
+            {
                 TakeEvent(e);
             }
-        }
-
-        private static bool CheckFilter(string fiterKey, string eventKey, string filterValue, string eventValue)
-        {
-            return string.Equals(fiterKey, eventKey, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(filterValue, eventValue);
         }
 
         private static void TakeEvent(TraceEvent e, string description = null)
