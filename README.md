@@ -206,7 +206,7 @@ Copyright Sasha Goldshtein 2016
 
 Examples:
   etrace --clr GC --event GC/AllocationTick
-  etrace --kernel Process,Thread,FileIO,FileIOInit --event File/Create
+  etrace --kernel Process,Thread,FileIO,FileIOInit --event FileIO/Create
   etrace --file trace.etl --stats
   etrace --clr GC --event GC/Start --field PID,TID,Reason[12],Type
   etrace --kernel Process --event Process/Start --where ImageFileName=myapp
