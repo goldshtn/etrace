@@ -85,7 +85,7 @@ namespace etrace
             var help = HelpText.AutoBuild(this);
             help.AddPostOptionsLine("Examples:");
             help.AddPostOptionsLine("  etrace --clr GC --event GC/AllocationTick");
-            help.AddPostOptionsLine("  etrace --kernel Process,Thread,FileIO,FileIOInit --event File/Create");
+            help.AddPostOptionsLine("  etrace --kernel Process,Thread,FileIO,FileIOInit --event FileIO/Create");
             help.AddPostOptionsLine("  etrace --file trace.etl --stats");
             help.AddPostOptionsLine("  etrace --clr GC --event GC/Start --field PID,TID,Reason[12],Type");
             help.AddPostOptionsLine("  etrace --kernel Process --event Process/Start --where ImageFileName=myapp");
