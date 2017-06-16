@@ -157,7 +157,7 @@ namespace etrace
             dispatcher.Kernel.All += ProcessEvent;
             dispatcher.Dynamic.All += ProcessEvent;
 
-            dispatcher.Process();
+             dispatcher.Process();
         }
 
         private static void List()
@@ -239,9 +239,6 @@ namespace etrace
                 }
             }
             else
-            {
-
-            }
             {
                 TakeEvent(e);
             }
