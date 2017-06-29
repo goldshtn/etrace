@@ -240,9 +240,6 @@ namespace etrace
             }
             else
             {
-
-            }
-            {
                 TakeEvent(e);
             }
         }
