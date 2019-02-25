@@ -79,6 +79,9 @@ namespace etrace
             )]
         public int DurationInSeconds { get; set; } = 0;
 
+        [Option("outfile", Required = false, HelpText = "The ETL file to export.")]
+        public string OutFile { get; set; }
+
         [HelpOption]
         public string Usage()
         {
@@ -95,6 +98,7 @@ namespace etrace
             help.AddPostOptionsLine("  etrace --kernel Process --event --where \"ThreadId=1999 && ProcessId=4\"");
             help.AddPostOptionsLine("  etrace --clr GC --event GC/Start --duration 60");
             help.AddPostOptionsLine("  etrace --other Microsoft-Windows-Win32k --event QueuePostMessage");
+            help.AddPostOptionsLine("  etrace --kernel Process --event Thread/Stop --outfile events.etl");
             help.AddPostOptionsLine("  etrace --list CLR,Kernel");
 
             return help.ToString();
@@ -199,6 +203,7 @@ namespace etrace
         public List<Filter> ParsedFilters { get; } = new List<Filter>();
         public Regex ParsedRawFilter { get; private set; }
         public bool IsFileSession => !String.IsNullOrEmpty(File);
+        public bool IsOutFile=> !String.IsNullOrEmpty(OutFile);
         public long ParsedClrKeywords { get; private set; } = 0;
         public KernelTraceEventParser.Keywords ParsedKernelKeywords { get; private set; } = KernelTraceEventParser.Keywords.None;
 

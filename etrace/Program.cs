@@ -18,6 +18,8 @@ namespace etrace
         static private ulong notFilteredEvents = 0;
         static private Stopwatch sessionStartStopwatch;
         static private bool statsPrinted = false;
+        static private ETWReloggerTraceEventSource outRelogger;
+        static private bool isOutReloggerSet = false;
 
         static void Main(string[] args)
         {
@@ -117,7 +119,6 @@ namespace etrace
                 Task.Delay(TimeSpan.FromSeconds(options.DurationInSeconds))
                     .ContinueWith(_ => CloseSession());
             }
-
             using (session = new TraceEventSession("etrace-realtime-session"))
             {
                 if (options.ParsedKernelKeywords != KernelTraceEventParser.Keywords.None)
@@ -146,8 +147,15 @@ namespace etrace
                         }
                     }
                 }
-
-                ProcessTrace(session.Source);
+                if (options.IsOutFile)
+                {
+                    outRelogger = new ETWReloggerTraceEventSource(session.SessionName, TraceEventSourceType.Session, options.OutFile);
+                    isOutReloggerSet = true;
+                    ProcessTrace(outRelogger);
+                } else
+                {
+                    ProcessTrace(session.Source);
+                }
             }
         }
 
@@ -246,7 +254,11 @@ namespace etrace
 
         private static void TakeEvent(TraceEvent e, string description = null)
         {
-            if (description != null)
+            if (isOutReloggerSet)
+            {
+                outRelogger.WriteEvent(e);
+            }
+            else if (description != null)
             {
                 eventProcessor.TakeEvent(e, description);
             }
